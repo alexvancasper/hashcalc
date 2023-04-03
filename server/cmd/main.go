@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	LRUCache "hashserver/internal/cache"
 	"hashserver/internal/config"
 	psql "hashserver/internal/database"
 	"hashserver/internal/handlers"
@@ -26,7 +27,7 @@ func init() {
 	// MyLogger.AddHook(hook)
 	MyLogger.SetFormatter(gelfFmt)
 	MyLogger.SetOutput(os.Stdout)
-	MyLogger.SetLevel(logrus.DebugLevel)
+	MyLogger.SetLevel(logrus.InfoLevel)
 }
 
 func main() {
@@ -59,6 +60,7 @@ func main() {
 	server := &handlers.Server{}
 	server.DB = db
 	server.Logger = MyLogger
+	server.Cache = LRUCache.NewLRUCache(100)
 	hashcalc.RegisterHashCalcServer(s, server)
 	if err := s.Serve(lis); err != nil {
 		MyLogger.Panic(err)

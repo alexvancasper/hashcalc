@@ -1,79 +1,67 @@
-package cache
+package LRUCache
 
 import (
-	"context"
-	"encoding/json"
-	"log"
-	"module13/internal/entities"
-	"os"
-	"time"
-
-	"github.com/redis/go-redis/v9"
+	"container/list"
+	"sync"
 )
 
-type record struct {
-	entity entities.User
+type LRUCache struct {
+	mutex sync.Mutex
+	m     map[int64]*cacheMap
+	cap   int
+	l     list.List
 }
 
-type Cache struct {
-	db *redis.Client
+type cacheMap struct {
+	elem  *list.Element
+	value string
 }
 
-func (r *record) MarshalBinary() (data []byte, err error) {
-	bytes, err := json.Marshal(r.entity)
-	return bytes, err
-}
-
-func (r *record) UnmarshalBinary(data []byte) error {
-	err := json.Unmarshal(data, &r.entity)
-	return err
-}
-
-func (c *Cache) Set(key string, e entities.User, time time.Duration) {
-	r := record{entity: e}
-	data, err := r.MarshalBinary()
-	if err != nil {
-		log.Printf("[Cache Set] Marshalling error %s", err)
-		return
-	}
-	err = c.db.Set(context.TODO(), key, data, time).Err()
-	if err != nil {
-		log.Printf("[Cache Set] Entity added failed %s", err)
+func NewLRUCache(cap int) *LRUCache {
+	return &LRUCache{
+		m:   map[int64]*cacheMap{},
+		cap: cap,
+		l:   list.List{},
 	}
 }
 
-func (c *Cache) Get(key string) (entities.User, bool) {
-	var buf []byte
-	err := c.db.Get(context.TODO(), key).Scan(&buf)
-
-	if err == redis.Nil {
-		log.Printf("key does not exist %s", key)
-		return entities.User{}, false
-	} else if err != nil {
-		log.Printf("[Cache Get] failed to fetch data")
-		return entities.User{}, false
+func (ch *LRUCache) Get(key int64) (value string, ok bool) {
+	ch.mutex.Lock()
+	defer ch.mutex.Unlock()
+	val, ok := ch.m[key]
+	if !ok {
+		return "", false
 	}
-	r := record{}
-	err = r.UnmarshalBinary(buf)
-	if err != nil {
-		log.Printf("[Cache GET] Unmarshal error %s", err)
-	}
-
-	return r.entity, true
-
+	ch.l.MoveToFront(val.elem)
+	return val.value, true
 }
 
-func NewCache() *Cache {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: os.Getenv("REDIS_PASS"), // no password set
-		DB:       0,                       // use default DB
-	})
-	status := rdb.Ping(context.TODO())
-	if status.Err() != nil {
-		panic(status.Err())
+func (ch *LRUCache) Add(key int64, value string) {
+	ch.mutex.Lock()
+	defer ch.mutex.Unlock()
+	if v, ok := ch.m[key]; !ok {
+		el := ch.l.PushFront(key)
+		ch.m[key] = &cacheMap{
+			elem:  el,
+			value: value,
+		}
+		if ch.l.Len() > ch.cap {
+			backEl := ch.l.Back()
+			backElKey := backEl.Value.(int64)
+			ch.l.Remove(backEl)
+			delete(ch.m, backElKey)
+		}
+	} else {
+		v.value = value
+		ch.l.MoveToFront(v.elem)
 	}
-	result := rdb.Info(context.TODO())
-	log.Printf("%+v\n", result)
-	return &Cache{db: rdb}
+}
+
+func (ch *LRUCache) Remove(key int64) (ok bool) {
+	if val, ok := ch.m[key]; ok {
+		ch.l.Remove(val.elem)
+		delete(ch.m, key)
+		return true
+	}
+	return false
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"fmt"
+	LRUCache "hashserver/internal/cache"
 	psql "hashserver/internal/database"
 	"hashserver/pkg/hashcalc"
 	"hashserver/pkg/hasher"
@@ -14,6 +15,7 @@ import (
 type Server struct {
 	DB     psql.Repository
 	Logger *logrus.Logger
+	Cache  *LRUCache.LRUCache
 	hashcalc.UnimplementedHashCalcServer
 }
 
@@ -58,7 +60,7 @@ func (s *Server) ComputeHash(ctx context.Context, input *hashcalc.StringList) (*
 			"service":    "ComputeHash",
 			"id":         id,
 			"input line": input.Lines[i],
-		}).Debug("Hash computed and inserted into DB")
+		}).Info("Hash computed and inserted into DB")
 
 		h := hashcalc.Hash{
 			Id:   id,
@@ -76,6 +78,20 @@ func (s *Server) GetHash(ctx context.Context, in *hashcalc.IDList) (*hashcalc.Ar
 	result.Hash = make([]*hashcalc.Hash, 0, len(in.Ids))
 
 	for i := 0; i < len(in.Ids); i++ {
+
+		if value, ok := s.Cache.Get(in.Ids[i]); ok {
+			result.Hash = append(result.Hash, &hashcalc.Hash{
+				Id:   in.Ids[i],
+				Hash: value,
+			})
+			s.Logger.WithFields(logrus.Fields{
+				"service": "GetHash",
+				"action":  "CACHE Check",
+				"id":      in.Ids[i],
+			}).Debug("Hash has been found in cache")
+			continue
+		}
+
 		hash, err := psql.Select(context.TODO(), conn, in.Ids[i])
 		if err != nil && err != psql.EmptySelect {
 			s.Logger.WithFields(logrus.Fields{
@@ -96,13 +112,19 @@ func (s *Server) GetHash(ctx context.Context, in *hashcalc.IDList) (*hashcalc.Ar
 		s.Logger.WithFields(logrus.Fields{
 			"service": "GetHash",
 			"id":      in.Ids[i],
-		}).Debug("Hash fetched from DB")
+		}).Info("Hash fetched from DB")
 
 		h := hashcalc.Hash{
 			Id:   in.Ids[i],
 			Hash: hash,
 		}
 		result.Hash = append(result.Hash, &h)
+		s.Cache.Add(in.Ids[i], hash)
+		s.Logger.WithFields(logrus.Fields{
+			"service": "GetHash",
+			"action":  "CACHE Check",
+			"id":      in.Ids[i],
+		}).Debug("Hash has been added into cache")
 	}
 	return &result, nil
 }
