@@ -17,7 +17,7 @@ message StringList {
 }
 
 message IDList {
-    repeated int64 lines = 1;
+    repeated int64 ids = 1;
 }
 
 message ArrayHash {

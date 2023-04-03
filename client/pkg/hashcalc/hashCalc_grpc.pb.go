@@ -19,14 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	HashCalc_CalcSHA3_FullMethodName = "/HashCalcService.HashCalc/CalcSHA3"
+	HashCalc_ComputeHash_FullMethodName = "/HashCalcService.HashCalc/ComputeHash"
+	HashCalc_GetHash_FullMethodName     = "/HashCalcService.HashCalc/GetHash"
 )
 
 // HashCalcClient is the client API for HashCalc service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type HashCalcClient interface {
-	CalcSHA3(ctx context.Context, in *TextList, opts ...grpc.CallOption) (*TextList, error)
+	ComputeHash(ctx context.Context, in *StringList, opts ...grpc.CallOption) (*ArrayHash, error)
+	GetHash(ctx context.Context, in *IDList, opts ...grpc.CallOption) (*ArrayHash, error)
 }
 
 type hashCalcClient struct {
@@ -37,9 +39,18 @@ func NewHashCalcClient(cc grpc.ClientConnInterface) HashCalcClient {
 	return &hashCalcClient{cc}
 }
 
-func (c *hashCalcClient) CalcSHA3(ctx context.Context, in *TextList, opts ...grpc.CallOption) (*TextList, error) {
-	out := new(TextList)
-	err := c.cc.Invoke(ctx, HashCalc_CalcSHA3_FullMethodName, in, out, opts...)
+func (c *hashCalcClient) ComputeHash(ctx context.Context, in *StringList, opts ...grpc.CallOption) (*ArrayHash, error) {
+	out := new(ArrayHash)
+	err := c.cc.Invoke(ctx, HashCalc_ComputeHash_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *hashCalcClient) GetHash(ctx context.Context, in *IDList, opts ...grpc.CallOption) (*ArrayHash, error) {
+	out := new(ArrayHash)
+	err := c.cc.Invoke(ctx, HashCalc_GetHash_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +61,8 @@ func (c *hashCalcClient) CalcSHA3(ctx context.Context, in *TextList, opts ...grp
 // All implementations must embed UnimplementedHashCalcServer
 // for forward compatibility
 type HashCalcServer interface {
-	CalcSHA3(context.Context, *TextList) (*TextList, error)
+	ComputeHash(context.Context, *StringList) (*ArrayHash, error)
+	GetHash(context.Context, *IDList) (*ArrayHash, error)
 	mustEmbedUnimplementedHashCalcServer()
 }
 
@@ -58,8 +70,11 @@ type HashCalcServer interface {
 type UnimplementedHashCalcServer struct {
 }
 
-func (UnimplementedHashCalcServer) CalcSHA3(context.Context, *TextList) (*TextList, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CalcSHA3 not implemented")
+func (UnimplementedHashCalcServer) ComputeHash(context.Context, *StringList) (*ArrayHash, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ComputeHash not implemented")
+}
+func (UnimplementedHashCalcServer) GetHash(context.Context, *IDList) (*ArrayHash, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetHash not implemented")
 }
 func (UnimplementedHashCalcServer) mustEmbedUnimplementedHashCalcServer() {}
 
@@ -74,20 +89,38 @@ func RegisterHashCalcServer(s grpc.ServiceRegistrar, srv HashCalcServer) {
 	s.RegisterService(&HashCalc_ServiceDesc, srv)
 }
 
-func _HashCalc_CalcSHA3_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TextList)
+func _HashCalc_ComputeHash_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StringList)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(HashCalcServer).CalcSHA3(ctx, in)
+		return srv.(HashCalcServer).ComputeHash(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: HashCalc_CalcSHA3_FullMethodName,
+		FullMethod: HashCalc_ComputeHash_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(HashCalcServer).CalcSHA3(ctx, req.(*TextList))
+		return srv.(HashCalcServer).ComputeHash(ctx, req.(*StringList))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _HashCalc_GetHash_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDList)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HashCalcServer).GetHash(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HashCalc_GetHash_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HashCalcServer).GetHash(ctx, req.(*IDList))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -100,8 +133,12 @@ var HashCalc_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*HashCalcServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CalcSHA3",
-			Handler:    _HashCalc_CalcSHA3_Handler,
+			MethodName: "ComputeHash",
+			Handler:    _HashCalc_ComputeHash_Handler,
+		},
+		{
+			MethodName: "GetHash",
+			Handler:    _HashCalc_GetHash_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
