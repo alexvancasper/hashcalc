@@ -1,0 +1,25 @@
+syntax = "proto3";
+option go_package="./pkg/hashcalc;hashcalc";
+package HashCalcService;
+
+service HashCalc {
+rpc ComputeHash (StringList) returns (ArrayHash) {}     // POST /send
+rpc GetHash (IDList) returns (ArrayHash) {}             // GET /check
+}
+
+message Hash {
+    int64 id = 1;
+    string hash = 2;
+}
+
+message StringList {
+    repeated string lines = 1;
+}
+
+message IDList {
+    repeated int64 lines = 1;
+}
+
+message ArrayHash {
+    repeated Hash hash = 1;
+}
