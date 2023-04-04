@@ -7,8 +7,10 @@ import (
 )
 
 type Config struct {
-	DSN  string
-	Port string
+	DSN             string
+	Port            string
+	DBPOOLCOUNT     int
+	WORKERPOOLCOUNT int
 }
 
 func InitConfig(prefix string) (*Config, error) {

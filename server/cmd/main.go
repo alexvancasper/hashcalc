@@ -39,16 +39,10 @@ func main() {
 	if cfg.Port == "" {
 		cfg.Port = Port
 	}
-	db, err := psql.New(cfg.DSN)
+	dbPool, err := psql.New(cfg.DSN, cfg.DBPOOLCOUNT)
 	if err != nil {
 		MyLogger.Panic(err)
 	}
-
-	// repo := repositories.New(db)
-	// router := gin.Default()
-	// handlerService := handlers.New(router, repo)
-	// handlerService.Registry()
-	// _ = router.Run(fmt.Sprintf(":%s", cfg.Port))
 
 	listenAddr := fmt.Sprintf(":%s", cfg.Port)
 	MyLogger.Printf("Starting server %s", listenAddr)
@@ -58,9 +52,10 @@ func main() {
 	}
 	s := grpc.NewServer()
 	server := &handlers.Server{}
-	server.DB = db
+	server.DB = dbPool
 	server.Logger = MyLogger
-	server.Cache = LRUCache.NewLRUCache(100)
+	server.Cache = LRUCache.NewLRUCache(10)
+	server.Workers = cfg.WORKERPOOLCOUNT
 	hashcalc.RegisterHashCalcServer(s, server)
 	if err := s.Serve(lis); err != nil {
 		MyLogger.Panic(err)

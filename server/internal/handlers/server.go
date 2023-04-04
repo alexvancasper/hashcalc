@@ -2,78 +2,51 @@ package handlers
 
 import (
 	"context"
-	b64 "encoding/base64"
+
 	"fmt"
 	LRUCache "hashserver/internal/cache"
 	psql "hashserver/internal/database"
 	"hashserver/pkg/hashcalc"
-	"hashserver/pkg/hasher"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 )
 
 type Server struct {
-	DB     psql.Repository
-	Logger *logrus.Logger
-	Cache  *LRUCache.LRUCache
+	DB      *psql.Instance
+	Logger  *logrus.Logger
+	Cache   *LRUCache.LRUCache
+	Workers int
 	hashcalc.UnimplementedHashCalcServer
 }
 
 func (s *Server) ComputeHash(ctx context.Context, input *hashcalc.StringList) (*hashcalc.ArrayHash, error) {
 	var result hashcalc.ArrayHash
-	result.Hash = make([]*hashcalc.Hash, 0, len(input.Lines))
 	s.Logger.WithFields(logrus.Fields{
 		"service":    "ComputeHash",
 		"count":      len(input.Lines),
 		"input data": input.Lines,
 	}).Debug("start to compute")
-	conn := s.DB.GetConnection()
 
-	for i := 0; i < len(input.Lines); i++ {
-		hash := hasher.Hash(input.Lines[i])
-		s.Logger.WithFields(logrus.Fields{
-			"service": "ComputeHash",
-			"action":  "DB INSERT",
-			"text":    input.Lines[i],
-		}).Debug("hash calculated")
-
-		b64string := b64.StdEncoding.EncodeToString([]byte(input.Lines[i]))
-		id, err := psql.Insert(context.TODO(), conn, b64string, hash)
-		if err != nil && err != psql.EmptyInsert {
-			s.Logger.WithFields(logrus.Fields{
-				"service": "ComputeHash",
-				"action":  "DB INSERT",
-				"text":    input.Lines[i],
-			}).Errorf("failed to insert to DB: %v", err)
-			return nil, err
-		}
-		if err == psql.EmptyInsert {
-			s.Logger.WithFields(logrus.Fields{
-				"service":    "ComputeHash",
-				"action":     "DB INSERT",
-				"input line": input.Lines[i],
-			}).Infof("duplicate - skip")
-			continue
-		}
-
+	var wg sync.WaitGroup
+	wg.Add(s.Workers)
+	jobs, answer := workerInit(&wg, s.Workers)
+	result.Hash = workPool(input.Lines, jobs, answer)
+	wg.Wait()
+	err := s.DB.MultiHashInsert(context.TODO(), result.Hash)
+	if err != nil {
 		s.Logger.WithFields(logrus.Fields{
 			"service":    "ComputeHash",
-			"id":         id,
-			"input line": input.Lines[i],
-		}).Info("Hash computed and inserted into DB")
-
-		h := hashcalc.Hash{
-			Id:   id,
-			Hash: hash,
-		}
-		result.Hash = append(result.Hash, &h)
+			"count":      len(input.Lines),
+			"input data": input.Lines,
+		}).Debug("start to compute")
+		return nil, fmt.Errorf("[ComputeHash] error %v", err)
 	}
+
 	return &result, nil
 }
 
 func (s *Server) GetHash(ctx context.Context, in *hashcalc.IDList) (*hashcalc.ArrayHash, error) {
-	conn := s.DB.GetConnection()
-
 	var result hashcalc.ArrayHash
 	result.Hash = make([]*hashcalc.Hash, 0, len(in.Ids))
 
@@ -91,8 +64,7 @@ func (s *Server) GetHash(ctx context.Context, in *hashcalc.IDList) (*hashcalc.Ar
 			}).Debug("Hash has been found in cache")
 			continue
 		}
-
-		hash, err := psql.Select(context.TODO(), conn, in.Ids[i])
+		hash, err := s.DB.Select(context.TODO(), in.Ids[i])
 		if err != nil && err != psql.EmptySelect {
 			s.Logger.WithFields(logrus.Fields{
 				"service": "GetHash",
