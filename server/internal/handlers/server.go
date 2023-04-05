@@ -76,6 +76,13 @@ func (s *Server) GetHash(ctx context.Context, in *hashcalc.IDList) (*hashcalc.Ar
 	var result hashcalc.ArrayHash
 	result.Hash = make([]*hashcalc.Hash, 0, len(in.Ids))
 
+	s.Logger.WithFields(logrus.Fields{
+		"service": "ComputeHash",
+		"module":  "server",
+		"uuid":    in.Uuid,
+		"count":   len(in.Ids),
+	}).Info("start to fetch data")
+
 	for i := 0; i < len(in.Ids); i++ {
 
 		if value, ok := s.Cache.Get(in.Ids[i]); ok {
@@ -131,5 +138,13 @@ func (s *Server) GetHash(ctx context.Context, in *hashcalc.IDList) (*hashcalc.Ar
 			"id":      in.Ids[i],
 		}).Debug("added to cache")
 	}
+
+	s.Logger.WithFields(logrus.Fields{
+		"service": "ComputeHash",
+		"module":  "server",
+		"uuid":    in.Uuid,
+		"count":   len(in.Ids),
+	}).Info("finish to fetch data")
+
 	return &result, nil
 }
