@@ -9,6 +9,9 @@ import (
 	"hashserver/pkg/hashcalc"
 	"sync"
 
+	metrics "hashserver/internal/metrics"
+
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,32 +24,55 @@ type Server struct {
 }
 
 func (s *Server) ComputeHash(ctx context.Context, input *hashcalc.StringList) (*hashcalc.ArrayHash, error) {
+	metrics.SendCall.Add(1)
 	var result hashcalc.ArrayHash
 	s.Logger.WithFields(logrus.Fields{
-		"service":    "ComputeHash",
-		"count":      len(input.Lines),
-		"input data": input.Lines,
-	}).Debug("start to compute")
+		"service": "ComputeHash",
+		"module":  "server",
+		"uuid":    input.Uuid,
+		"count":   len(input.Lines),
+	}).Info("start to compute")
 
 	var wg sync.WaitGroup
 	wg.Add(s.Workers)
 	jobs, answer := workerInit(&wg, s.Workers)
 	result.Hash = workPool(input.Lines, jobs, answer)
 	wg.Wait()
+	s.Logger.WithFields(logrus.Fields{
+		"service": "ComputeHash",
+		"module":  "server",
+		"uuid":    input.Uuid,
+	}).Debug("hashes calculated")
+
 	err := s.DB.MultiHashInsert(context.TODO(), result.Hash)
 	if err != nil {
 		s.Logger.WithFields(logrus.Fields{
-			"service":    "ComputeHash",
-			"count":      len(input.Lines),
-			"input data": input.Lines,
-		}).Debug("start to compute")
-		return nil, fmt.Errorf("[ComputeHash] error %v", err)
+			"service":  "ComputeHash",
+			"module":   "server",
+			"uuid":     input.Uuid,
+			"function": "MultiHashInsert",
+			"error":    errors.WithStack(err),
+		}).Error("not able to insert data into DB")
+		return nil, fmt.Errorf("[ComputeHash] error %v", errors.WithStack(err))
 	}
+
+	s.Logger.WithFields(logrus.Fields{
+		"service": "ComputeHash",
+		"module":  "server",
+		"uuid":    input.Uuid,
+	}).Debug("hashes inserted into db")
+	s.Logger.WithFields(logrus.Fields{
+		"service": "ComputeHash",
+		"module":  "server",
+		"uuid":    input.Uuid,
+		"count":   len(input.Lines),
+	}).Info("finish to compute")
 
 	return &result, nil
 }
 
 func (s *Server) GetHash(ctx context.Context, in *hashcalc.IDList) (*hashcalc.ArrayHash, error) {
+	metrics.CheckCall.Add(1)
 	var result hashcalc.ArrayHash
 	result.Hash = make([]*hashcalc.Hash, 0, len(in.Ids))
 
@@ -59,32 +85,38 @@ func (s *Server) GetHash(ctx context.Context, in *hashcalc.IDList) (*hashcalc.Ar
 			})
 			s.Logger.WithFields(logrus.Fields{
 				"service": "GetHash",
-				"action":  "CACHE Check",
+				"module":  "server",
+				"uuid":    in.Uuid,
 				"id":      in.Ids[i],
-			}).Debug("Hash has been found in cache")
+			}).Debug("found in cache")
 			continue
 		}
 		hash, err := s.DB.Select(context.TODO(), in.Ids[i])
 		if err != nil && err != psql.EmptySelect {
 			s.Logger.WithFields(logrus.Fields{
 				"service": "GetHash",
-				"action":  "DB SELECT",
-			}).Error(err)
-			return nil, fmt.Errorf("[GetHash] selecting error %v", err)
+				"module":  "server",
+				"uuid":    in.Uuid,
+				"error":   errors.WithStack(err),
+			}).Error("cannot select data from db")
+			return nil, fmt.Errorf("[GetHash] selecting error %v", errors.WithStack(err))
 		}
 		if err == psql.EmptySelect {
 			s.Logger.WithFields(logrus.Fields{
 				"service": "GetHash",
-				"action":  "DB SELECT",
+				"module":  "server",
+				"uuid":    in.Uuid,
 				"id":      in.Ids[i],
-			}).Infof("Request ID has not been found ")
+			}).Infof("Request ID has not been found")
 			continue
 		}
 
 		s.Logger.WithFields(logrus.Fields{
 			"service": "GetHash",
+			"module":  "server",
+			"uuid":    in.Uuid,
 			"id":      in.Ids[i],
-		}).Info("Hash fetched from DB")
+		}).Debug("Hash fetched from DB")
 
 		h := hashcalc.Hash{
 			Id:   in.Ids[i],
@@ -94,9 +126,10 @@ func (s *Server) GetHash(ctx context.Context, in *hashcalc.IDList) (*hashcalc.Ar
 		s.Cache.Add(in.Ids[i], hash)
 		s.Logger.WithFields(logrus.Fields{
 			"service": "GetHash",
-			"action":  "CACHE Check",
+			"module":  "server",
+			"uuid":    in.Uuid,
 			"id":      in.Ids[i],
-		}).Debug("Hash has been added into cache")
+		}).Debug("added to cache")
 	}
 	return &result, nil
 }
