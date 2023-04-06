@@ -17,6 +17,7 @@ import (
 var (
 	SendCall  prometheus.Counter
 	CheckCall prometheus.Counter
+	stopSrv   srv
 )
 
 type MetricServer struct {
@@ -24,6 +25,10 @@ type MetricServer struct {
 	Port      string
 	Path      string
 	MetricLog *logrus.Logger
+}
+
+type srv struct {
+	server chan os.Signal
 }
 
 func NewMetricServer() *MetricServer {
@@ -54,6 +59,7 @@ func (m *MetricServer) Start() {
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 
 	sig := make(chan os.Signal, 1)
+	stopSrv.server = sig
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
 		<-sig

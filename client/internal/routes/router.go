@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"fmt"
+	"hash-service-client/internal/config"
 	"hash-service-client/internal/handlers"
 	MW "hash-service-client/internal/middleware"
 	"net/http"
@@ -17,10 +18,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func Start(logger *logrus.Logger, port string) {
+func Start(logger *logrus.Logger, cfg *config.Config) {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.WithValue("logger", logger))
+	r.Use(middleware.WithValue("config", cfg))
 	r.Use(MW.UUIDMiddleware)
 	r.Use(middleware.Recoverer)
 	httpClient := &http.Client{Timeout: time.Second * 5}
@@ -30,7 +32,7 @@ func Start(logger *logrus.Logger, port string) {
 	r.Get("/send", h.Web)
 	r.Post("/send", h.Send)
 
-	server := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%s", port), Handler: r}
+	server := &http.Server{Addr: fmt.Sprintf("%s:%s", cfg.Client.Host, cfg.Client.Port), Handler: r}
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 
 	sig := make(chan os.Signal, 1)
@@ -48,11 +50,11 @@ func Start(logger *logrus.Logger, port string) {
 		if err != nil {
 			logger.Fatal(err)
 		}
-		logger.Info("WebUI erver graceful shutdown")
+		logger.Info("WebUI server graceful shutdown")
 		serverStopCtx()
 	}()
 
-	logger.Infof("Starting WebUI on port %s", port)
+	logger.Infof("Starting WebUI on port %s:%s", cfg.Client.Host, cfg.Client.Port)
 	err := server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		logger.Fatal(err)

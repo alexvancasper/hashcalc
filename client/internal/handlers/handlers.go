@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"hash-service-client/internal/config"
 	metrics "hash-service-client/internal/metrics"
 	"hash-service-client/internal/middleware"
 
@@ -22,15 +23,14 @@ import (
 )
 
 const (
-	grpServer string        = "localhost:8080"
-	timeout   time.Duration = 5
+	timeout time.Duration = 5
 )
 
 func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 	metrics.SendCall.Add(1)
 	UUID := r.Context().Value(middleware.RequestContextID).(string)
 	logger := r.Context().Value("logger").(*logrus.Logger)
-	w.Header().Add("X-REQUEST-ID", UUID)
+	cfg := r.Context().Value("config").(*config.Config)
 
 	dataBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -63,15 +63,17 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	grpServer := fmt.Sprintf("%s:%s", cfg.Grpc.Host, cfg.Grpc.Port)
 	cwt, _ := context.WithTimeout(context.Background(), time.Second*timeout)
 	conn, err := grpc.DialContext(cwt, grpServer, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		logger.WithFields(logrus.Fields{
-			"service":  "WEBUI",
-			"module":   "client",
-			"uuid":     UUID,
-			"function": "Send",
-			"error":    fmt.Sprintf("%v", errors.WithStack(err)),
+			"service":           "WEBUI",
+			"module":            "client",
+			"uuid":              UUID,
+			"function":          "Send",
+			"error":             fmt.Sprintf("%v", errors.WithStack(err)),
+			"connection string": grpServer,
 		}).Error("gRPC server error")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -116,6 +118,13 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 		"function": "Send",
 	}).Info("received data from gRPC server")
 
+	logger.WithFields(logrus.Fields{
+		"service":  "WEBUI",
+		"module":   "client",
+		"uuid":     UUID,
+		"function": "Send",
+	}).Trace(fmt.Sprintf("payload: %+v", result.Hash))
+
 	data, err := json.Marshal(result.Hash)
 	if err != nil {
 		logger.WithFields(logrus.Fields{
@@ -145,7 +154,7 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	metrics.CheckCall.Add(1)
 	UUID := r.Context().Value(middleware.RequestContextID).(string)
 	logger := r.Context().Value("logger").(*logrus.Logger)
-	w.Header().Add("X-REQUEST-ID", UUID)
+	cfg := r.Context().Value("config").(*config.Config)
 
 	inputStr := r.URL.Query().Get("ids")
 	input := strings.Split(inputStr, ",")
@@ -181,15 +190,17 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	grpServer := fmt.Sprintf("%s:%s", cfg.Grpc.Host, cfg.Grpc.Port)
 	cwt, _ := context.WithTimeout(context.Background(), time.Second*timeout)
 	conn, err := grpc.DialContext(cwt, grpServer, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		logger.WithFields(logrus.Fields{
-			"service":  "WEBUI",
-			"module":   "client",
-			"uuid":     UUID,
-			"function": "Check",
-			"error":    fmt.Sprintf("%v", err.Error()),
+			"service":           "WEBUI",
+			"module":            "client",
+			"uuid":              UUID,
+			"function":          "Check",
+			"error":             fmt.Sprintf("%v", err.Error()),
+			"connection string": grpServer,
 		}).Error("gRPC server error")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -216,7 +227,6 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(result.Hash) == 0 {
-		log.Printf("no data on the server")
 		logger.WithFields(logrus.Fields{
 			"service":  "WEBUI",
 			"module":   "client",

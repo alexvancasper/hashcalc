@@ -55,7 +55,6 @@ func (s *Server) ComputeHash(ctx context.Context, input *hashcalc.StringList) (*
 		}).Error("not able to insert data into DB")
 		return nil, fmt.Errorf("[ComputeHash] error %v", errors.WithStack(err))
 	}
-
 	s.Logger.WithFields(logrus.Fields{
 		"service": "ComputeHash",
 		"module":  "server",
@@ -67,6 +66,12 @@ func (s *Server) ComputeHash(ctx context.Context, input *hashcalc.StringList) (*
 		"uuid":    input.Uuid,
 		"count":   len(input.Lines),
 	}).Info("finish to compute")
+	s.Logger.WithFields(logrus.Fields{
+		"service": "ComputeHash",
+		"module":  "server",
+		"uuid":    input.Uuid,
+		"count":   len(input.Lines),
+	}).Trace(fmt.Sprintf("payload: %+v", result.Hash))
 
 	return &result, nil
 }
@@ -104,7 +109,7 @@ func (s *Server) GetHash(ctx context.Context, in *hashcalc.IDList) (*hashcalc.Ar
 				"service": "GetHash",
 				"module":  "server",
 				"uuid":    in.Uuid,
-				"error":   errors.WithStack(err),
+				"error":   fmt.Sprintf("%+v", errors.WithStack(err)),
 			}).Error("cannot select data from db")
 			return nil, fmt.Errorf("[GetHash] selecting error %v", errors.WithStack(err))
 		}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"godb/pkg/helpers/pg"
 	"hashserver/pkg/hashcalc"
 	"sync"
 
@@ -13,7 +12,8 @@ import (
 )
 
 type Instance struct {
-	Conn *pgxpool.Pool
+	Conn       *pgxpool.Pool
+	PoolConfig *pgxpool.Config
 }
 
 var (
@@ -27,36 +27,33 @@ func New(dsn string, number int) (*Instance, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Connect to DB error: %v", err)
 	}
-
 	poolConfig.MaxConns = int32(number)
 
-	//Создаем пул подключений
-	c, err := pg.NewConnection(poolConfig)
+	c, err := pgxpool.ConnectConfig(context.Background(), poolConfig)
 	if err != nil {
-		return nil, fmt.Errorf("Connect to database failed: %v\n", err)
+		return nil, err
 	}
 
-	//Проверяем подключение
 	_, err = c.Exec(context.Background(), ";")
 	if err != nil {
 		return nil, fmt.Errorf("Ping failed: %v\n", err)
 	}
 
-	repo := Instance{Conn: c}
+	repo := Instance{Conn: c, PoolConfig: poolConfig}
 
 	return &repo, nil
 
 }
 
-func (i *Instance) Insert(ctx context.Context, text, hash string) (int64, error) {
-	row := i.Conn.QueryRow(ctx, "INSERT INTO hashes (text, hash) VALUES ( $1, $2) ON CONFLICT (text) DO NOTHING RETURNING id", text, hash)
+func (i *Instance) Insert(ctx context.Context, hash string) (int64, error) {
+	row := i.Conn.QueryRow(ctx, "WITH t AS (INSERT INTO hashes (hash) VALUES ($1) ON CONFLICT (hash) DO NOTHING RETURNING id) SELECT * FROM t UNION ALL SELECT id FROM hashes WHERE hash = $1;", hash)
 	var id int64
 	err := row.Scan(&id)
 	if err != nil && err != pgx.ErrNoRows {
 		return 0, fmt.Errorf("Insert error: %v", err)
 	}
 	if err == pgx.ErrNoRows {
-		return 0, EmptyInsert
+		return id, EmptyInsert
 	}
 	return id, nil
 }
@@ -84,8 +81,7 @@ func (db *Instance) MultiHashInsert(ctx context.Context, hash []*hashcalc.Hash) 
 	wg.Wait()
 
 	for i := 0; i < len(hash); i++ {
-		h := <-HashIDs
-		hash[i] = h
+		hash[i] = <-HashIDs
 	}
 	wg.Wait()
 	return nil
@@ -93,7 +89,7 @@ func (db *Instance) MultiHashInsert(ctx context.Context, hash []*hashcalc.Hash) 
 
 func inserted(ctx context.Context, wg *sync.WaitGroup, conn *pgxpool.Pool, hash string, hashID chan<- *hashcalc.Hash) {
 	defer wg.Done()
-	row := conn.QueryRow(ctx, "INSERT INTO hashes (hash) VALUES ($1) ON CONFLICT (hash) DO NOTHING RETURNING id", hash)
+	row := conn.QueryRow(ctx, "WITH t AS (INSERT INTO hashes (hash) VALUES ($1) ON CONFLICT (hash) DO NOTHING RETURNING id) SELECT * FROM t UNION ALL SELECT id FROM hashes WHERE hash = $1;", hash)
 	var id int64
 	err := row.Scan(&id)
 	if err != nil {

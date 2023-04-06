@@ -1,26 +1,39 @@
 package main
 
 import (
+	"fmt"
+	"hash-service-client/internal/config"
 	"hash-service-client/internal/routes"
+	"log"
 	"os"
-	"syscall"
+
+	metrics "hash-service-client/internal/metrics"
 
 	formatter "github.com/fabienm/go-logrus-formatters"
-
-	// graylog "github.com/gemnasium/logrus-graylog-hook/v3"
-	metrics "hash-service-client/internal/metrics"
+	graylog "github.com/gemnasium/logrus-graylog-hook/v3"
 
 	"github.com/sirupsen/logrus"
 )
 
-const DefaultPort = "8070"
-
+var cfg *config.Config
 var MyLogger = logrus.New()
 
 func init() {
+	var err error
+	fmt.Printf("%+v\n", os.Args)
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: ./web <path to config>")
+		os.Exit(1)
+	}
+	ConfigPath := os.Args[len(os.Args)-1]
+	cfg, err = config.NewConfig(ConfigPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	gelfFmt := formatter.NewGelf("Compute web server")
-	// hook := graylog.NewGraylogHook("localhost:12201", map[string]interface{}{})
-	// MyLogger.AddHook(hook)
+	hook := graylog.NewGraylogHook(fmt.Sprintf("%s:%s", cfg.Logging.Host, cfg.Logging.Port), map[string]interface{}{})
+	MyLogger.AddHook(hook)
 	MyLogger.SetFormatter(gelfFmt)
 	MyLogger.SetOutput(os.Stdout)
 	MyLogger.SetLevel(logrus.InfoLevel)
@@ -28,17 +41,12 @@ func init() {
 
 func main() {
 	ms := metrics.NewMetricServer()
-	ms.Host = ""
-	ms.Port = "7766"
-	ms.Path = "metrics"
+	ms.Host = cfg.Metrics.Host
+	ms.Port = cfg.Metrics.Port
+	ms.Path = cfg.Metrics.Path
 	ms.MetricLog = MyLogger
 	go ms.Start()
 
-	port := DefaultPort
-	if value, ok := syscall.Getenv("CS_PORT"); ok {
-		port = value
-	}
-
-	routes.Start(MyLogger, port)
+	routes.Start(MyLogger, cfg)
 
 }
