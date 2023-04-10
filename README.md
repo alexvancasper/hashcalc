@@ -13,6 +13,32 @@ cd final/server
 docker-compose up -d
 ```
 
+Затем в браузере открыть 
+`http://localhost:8080/send`
+
+Для отправки хэшей нужно заполнить форму
+Для проверки хэшей
+`http://localhost:8080/check?ids=<num>`
+
+
+#### Либо используя curl
+
+Отправить хэш на сервер
+```sh
+curl -X 'POST' \
+  'http://localhost:8080/send' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '[ "string" ]'
+```
+Проверить хэш по id
+```sh
+ curl -X 'GET' \
+  'http://editor.swagger.io/check?ids=<num>' \
+  -H 'accept: application/json'
+```
+
+
 ### Как запустить тесты?
 Предварительно нужно поднять PostgreSQL
 
