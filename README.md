@@ -81,60 +81,60 @@ Trace =  6
 
 ```yaml
 server:
-name: Compute hash server
-host: 0.0.0.0
-port: 8090
-worker-count: 5
-cache-count: 5
-db:
-# Supported DB type is postgres only
-type: postgres
-pool-count: 5
-host: postgres
-port: 5432
-user: postgres
-pass: postgres
-dbname: hashdb
-ssl: disable
+  name: Compute hash server
+  host: 0.0.0.0
+  port: 8090
+  worker-count: 5
+  cache-count: 5
+  db:
+    # Supported DB type is postgres only
+    type: postgres
+    pool-count: 5
+    host: postgres
+    port: 5432
+    user: postgres
+    pass: postgres
+    dbname: hashdb
+    ssl: disable
 metric:
-host: 0.0.0.0
-port: 7755
-path: metrics
+  host: 0.0.0.0
+  port: 7755
+  path: metrics
 logging:
-provider: graylog
-host: graylog
-port: 12201
-level: 6
+  provider: graylog
+  host: graylog
+  port: 12201
+  level: 5
 ```
 #### Client
 ```yaml
 client:
-name: Compute hash client
-host: 0.0.0.0
-port: 8080
+  name: Compute hash client
+  host: 0.0.0.0
+  port: 8080
 grpc:
-host: hash-calc-service
-port: 8090
+  host: hash-calc-service
+  port: 8090
 metric:
-host: 0.0.0.0
-port: 7766
-path: metrics
+  host: 0.0.0.0
+  port: 7766
+  path: metrics
 logging:
-provider: graylog
-host: graylog
-port: 12201
-level: 6
+  provider: graylog
+  host: graylog
+  port: 12201
+  level: 5
 ```
 
 #### Prometheus
 ```yaml
 scrape_configs:
 - job_name: main
-scrape_interval: 5s
-static_configs:
-- targets:
-- hash-calc-service:7755
-- hash-calc-client:7766
+  scrape_interval: 5s
+  static_configs:
+  - targets:
+    - hash-calc-service:7755
+    - hash-calc-client:7766
 ```
 
 Для переопределения конфигурации, нужно добавить в конфигурацию соответствющего контейнера 
