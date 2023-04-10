@@ -39,7 +39,7 @@ server:
     port: 5432
     user: postgres
     pass: postgres
-    dbname: hashdb1
+    dbname: hashdb
     ssl: disable
 metric:
   host: 127.0.0.1

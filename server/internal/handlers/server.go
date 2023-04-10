@@ -35,7 +35,7 @@ func (s *Server) ComputeHash(ctx context.Context, input *hashcalc.StringList) (*
 
 	var wg sync.WaitGroup
 	wg.Add(s.Workers)
-	jobs, answer := workerInit(&wg, s.Workers)
+	jobs, answer := workerInit(&wg, s.Workers, len(input.Lines))
 	result.Hash = workPool(input.Lines, jobs, answer)
 	wg.Wait()
 	s.Logger.WithFields(logrus.Fields{

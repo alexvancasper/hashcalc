@@ -12,11 +12,11 @@ type workers struct {
 	result <-chan hashcalc.Hash
 }
 
-func workerInit(wg *sync.WaitGroup, num int) (chan<- hashcalc.Hash, <-chan hashcalc.Hash) {
-	jobs := make(chan hashcalc.Hash, num)
-	result := make(chan hashcalc.Hash, num)
+func workerInit(wg *sync.WaitGroup, num int, tasksCount int) (chan<- hashcalc.Hash, <-chan hashcalc.Hash) {
+	jobs := make(chan hashcalc.Hash, tasksCount)
+	result := make(chan hashcalc.Hash, tasksCount)
 	for num > 0 {
-		go worker(wg, num, jobs, result)
+		go worker(wg, jobs, result)
 		num--
 	}
 	return jobs, result
@@ -29,7 +29,7 @@ func workPool(task []string, jobs chan<- hashcalc.Hash, result <-chan hashcalc.H
 			Hash: task[j],
 		}
 	}
-	close(jobs)
+	defer close(jobs)
 
 	output := make([]*hashcalc.Hash, 0, len(task))
 	for i := 0; i < len(task); i++ {
@@ -39,7 +39,7 @@ func workPool(task []string, jobs chan<- hashcalc.Hash, result <-chan hashcalc.H
 	return output
 }
 
-func worker(wg *sync.WaitGroup, id int, job <-chan hashcalc.Hash, result chan<- hashcalc.Hash) {
+func worker(wg *sync.WaitGroup, job <-chan hashcalc.Hash, result chan<- hashcalc.Hash) {
 	defer wg.Done()
 	for j := range job {
 		result <- hashcalc.Hash{

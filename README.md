@@ -5,10 +5,39 @@
 Логи пишет в GrayLog, статистика собирается в Prometheus и визуализируется в Grafana.
 
 ### Как запустить?
-Для начала нужно прописать конфиги в docker-compose файле
-затем выполнить команду
+
+Склонировать репозиторий
 ```sh
+git clone <path to repo>
+cd final/server
 docker-compose up -d
+```
+
+### Как запустить тесты?
+Предварительно нужно поднять PostgreSQL
+
+```sh
+docker run -d --rm \
+    --name postgres_test \
+    -p 5432:5432 \
+    -e POSTGRES_PASSWORD=postgres \
+    -e POSTGRES_DB=hashdb \
+    postgres:latest
+```
+
+Удостовериться, что БД запустилась.
+```sh
+docker ps -a | grep postgres_test
+```
+Затем
+```sh
+~/final/server$ make test
+
+```
+
+Остановить PostgresQL
+```sh
+docker stop postgres_test
 ```
 
 ### Logging levels
