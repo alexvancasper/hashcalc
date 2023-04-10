@@ -12,9 +12,6 @@ services:
       - "8090:8090"
       - "7755:7755"
     restart: on-failure
-    volumes:
-      - ./prod/server.yaml:/go/server.yaml:ro
-      - ./prod/03042023122800_init.sql:/go/migrations/03042023122800_init.sql:ro
     depends_on:
       - postgres
   hash-calc-client:
@@ -24,15 +21,11 @@ services:
       - "8080:8080"
       - "7766:7766"
     restart: on-failure
-    volumes:
-      - ./prod/client.yaml:/go/client.yaml:ro
-      - ./prod/web:/go/web:ro
     depends_on:
       - hash-calc-service
   postgres:
     image: postgres
     tty: true
-    # container_name: postgres_db
     restart: always
     ports:
       - "5432:5432"
@@ -40,7 +33,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=hashdb
     volumes:
-      - ./postgres-data:/var/lib/postgresql/data
+      - ./prod/postgres-data:/var/lib/postgresql/data
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -88,7 +81,7 @@ services:
     environment:
     - GRAYLOG_PASSWORD_SECRET=somepasswordpepper
     - GRAYLOG_ROOT_PASSWORD_SHA2=8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
-    - GRAYLOG_HTTP_EXTERNAL_URI=http://localhost:9000/
+    - GRAYLOG_HTTP_EXTERNAL_URI=http://graylog:9000/
     networks:
     - graylog
     depends_on:
