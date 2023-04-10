@@ -51,7 +51,7 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 	var ok bool
 	var toServer hashcalc.StringList
 	toServer.Uuid = UUID
-	if toServer.Lines, ok = params["line"]; !ok {
+	if toServer.Lines, ok = params["params"]; !ok {
 		logger.WithFields(logrus.Fields{
 			"service":  "WEBUI",
 			"module":   "client",

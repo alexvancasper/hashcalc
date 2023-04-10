@@ -27,17 +27,15 @@ docker-compose up -d
 ```sh
 curl -X 'POST' \
   'http://localhost:8080/send' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d '[ "string" ]'
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'params="test-line"'
 ```
 Проверить хэш по id
 ```sh
- curl -X 'GET' \
-  'http://editor.swagger.io/check?ids=<num>' \
+curl -v -X 'GET' \
+  'http://localhost:8080/check?ids=<num>' \
   -H 'accept: application/json'
 ```
-
 
 ### Как запустить тесты?
 Предварительно нужно поднять PostgreSQL
@@ -138,18 +136,13 @@ static_configs:
 - hash-calc-service:7755
 - hash-calc-client:7766
 ```
-#### Migrations
-```sql
--- +goose Up
--- +goose StatementBegin
-CREATE  TABLE  hashes
-(
-id serial  primary key,
-hash  CHAR(128) UNIQUE
-);
--- +goose StatementEnd
--- +goose Down
--- +goose StatementBegin
-DROP  TABLE hashes;
--- +goose StatementEnd
+
+Для переопределения конфигурации, нужно добавить в конфигурацию соответствющего контейнера 
+конфигурацию volumes.
+
+пример
+```yaml
+  hash-calc-client:
+    volumes:
+      - ./prod/client.yaml:/go/client.yaml:ro  
 ```
