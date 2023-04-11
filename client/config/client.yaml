@@ -1,0 +1,16 @@
+client:
+  name: Compute hash client
+  host: 0.0.0.0
+  port: 8080
+grpc:
+  host: hash-calc-service
+  port: 8090
+metric:
+  host: 0.0.0.0
+  port: 7766
+  path: metrics
+logging:
+  provider: graylog
+  host: graylog
+  port: 12201
+  level: 5
