@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 type Handler struct {
-	HttpClient *http.Client
+	Logger *logrus.Logger
+	Server *grpc.ClientConn
 }
 
 func (h *Handler) Web(w http.ResponseWriter, r *http.Request) {
@@ -17,4 +21,11 @@ func (h *Handler) Web(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t.Execute(w, nil)
+}
+
+func NewHandler() *Handler {
+	return &Handler{
+		Logger: nil,
+		Server: nil,
+	}
 }

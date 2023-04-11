@@ -28,7 +28,7 @@ docker-compose up -d
 curl -X 'POST' \
   'http://localhost:8080/send' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d 'params="test-line"'
+  -d 'params="test-line1"&params="test-line2"'
 ```
 Проверить хэш по id
 ```sh

@@ -8,8 +8,8 @@ import (
 
 type workers struct {
 	Number int
-	jobs   chan<- hashcalc.Hash
-	result <-chan hashcalc.Hash
+	jobs   chan hashcalc.Hash
+	result chan hashcalc.Hash
 }
 
 func workerInit(wg *sync.WaitGroup, num int, tasksCount int) (chan<- hashcalc.Hash, <-chan hashcalc.Hash) {
@@ -36,6 +36,7 @@ func workPool(task []string, jobs chan<- hashcalc.Hash, result <-chan hashcalc.H
 		oneHash := <-result
 		output = append(output, &oneHash)
 	}
+
 	return output
 }
 

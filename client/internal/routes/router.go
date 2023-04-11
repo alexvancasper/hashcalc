@@ -14,19 +14,35 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 
 	"github.com/sirupsen/logrus"
 )
 
 func Start(logger *logrus.Logger, cfg *config.Config) {
+	l := logger.WithFields(logrus.Fields{
+		"service":  "WEBUI",
+		"module":   "client",
+		"function": "Start",
+	})
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	r.Use(middleware.WithValue("logger", logger))
-	r.Use(middleware.WithValue("config", cfg))
 	r.Use(MW.UUIDMiddleware)
 	r.Use(middleware.Recoverer)
-	httpClient := &http.Client{Timeout: time.Second * 5}
-	h := &handlers.Handler{HttpClient: httpClient}
+
+	cwt, stopConn := context.WithCancel(context.Background())
+	conn, err := grpc.DialContext(cwt, fmt.Sprintf("%s:%s", cfg.Grpc.Host, cfg.Grpc.Port), grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(time.Duration(5*time.Second)))
+	if err != nil {
+		l.WithField("error", fmt.Sprintf("%v", errors.WithStack(err))).Panic("not able to connect to grpc")
+		return
+	}
+	logger.Info("successfully connected to gRPC")
+	h := handlers.NewHandler()
+	h.Logger = logger
+	h.Server = conn
+	defer conn.Close()
 
 	r.Get("/check", h.Check)
 	r.Get("/send", h.Web)
@@ -43,22 +59,26 @@ func Start(logger *logrus.Logger, cfg *config.Config) {
 		go func() {
 			<-shutdownCtx.Done()
 			if shutdownCtx.Err() == context.DeadlineExceeded {
-				logger.Fatal("graceful shutdown timed out.. forcing exit.")
+				l.Fatal("graceful shutdown timed out.. forcing exit.")
 			}
 		}()
 		err := server.Shutdown(shutdownCtx)
 		if err != nil {
-			logger.Fatal(err)
+			l.Fatal(err)
 		}
-		logger.Info("WebUI server graceful shutdown")
+		stopConn()
+		l.Info("WebUI server graceful shutdown")
 		serverStopCtx()
+
 	}()
 
-	logger.Infof("Starting WebUI on port %s:%s", cfg.Client.Host, cfg.Client.Port)
-	err := server.ListenAndServe()
+	list_addr := fmt.Sprintf("%s:%s", cfg.Client.Host, cfg.Client.Port)
+	l.WithField("addr", list_addr).Infof("Starting WebUI on %s", list_addr)
+	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
-		logger.Fatal(err)
+		l.Fatal(err)
 	}
 
 	<-serverCtx.Done()
+	<-cwt.Done()
 }
