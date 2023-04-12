@@ -13,12 +13,10 @@ message Hash {
 }
 
 message StringList {
-    string uuid = 1;
     repeated string lines = 2;
 }
 
 message IDList {
-    string uuid = 1;
     repeated int64 ids = 2;
 }
 
